@@ -1,6 +1,8 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Crosshair, Shield, RefreshCw, Zap, Radio, ChevronsUp, Target, Bomb } from "lucide-react";
+import { Crosshair, Shield, RefreshCw, Zap, Radio, ChevronsUp, Target, Bomb, Mic, MicOff } from "lucide-react";
 import { Weapon } from "../types";
+import { webrtcVoice } from "../game/webrtcVoice";
+import { sounds } from "../game/audio";
 
 interface TouchControlsProps {
   onMove: (moveX: number, moveY: number, isSprinting: boolean) => void;
@@ -52,6 +54,18 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
   const [joystickOrigin, setJoystickOrigin] = useState<{ x: number; y: number } | null>(null);
   const [joystickPos, setJoystickPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isSprintLocked, setIsSprintLocked] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState(webrtcVoice.status);
+  const [isVoiceTalking, setIsVoiceTalking] = useState(false);
+  const [isVoiceMuted, setIsVoiceMuted] = useState(webrtcVoice.getSettings().isMuted);
+
+  useEffect(() => {
+    const unsubStatus = webrtcVoice.onStatusChange((s) => setVoiceStatus(s));
+    const unsubSpeaking = webrtcVoice.onLocalSpeaking((t) => setIsVoiceTalking(t));
+    return () => {
+      unsubStatus();
+      unsubSpeaking();
+    };
+  }, []);
 
   // Tracking Touches
   const joystickTouchId = useRef<number | null>(null);
@@ -419,6 +433,54 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
         <div className="flex flex-col items-center leading-none">
           <Radio className="w-4 h-4 text-amber-400" />
           <span className="text-[8px] font-bold uppercase tracking-tight mt-0.5">UAV</span>
+        </div>
+      </button>
+
+      {/* Mobile WebRTC Tactical Push-To-Talk / Voice Button */}
+      <button
+        id="btn-touch-voice-ptt"
+        type="button"
+        onTouchStart={(e) => {
+          e.stopPropagation();
+          if (voiceStatus !== "connected") {
+            webrtcVoice.startVoice();
+          } else {
+            webrtcVoice.setPTTHeld(true);
+          }
+        }}
+        onTouchEnd={(e) => {
+          e.stopPropagation();
+          webrtcVoice.setPTTHeld(false);
+        }}
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          if (voiceStatus !== "connected") {
+            webrtcVoice.startVoice();
+          } else {
+            webrtcVoice.setPTTHeld(true);
+          }
+        }}
+        onMouseUp={(e) => {
+          e.stopPropagation();
+          webrtcVoice.setPTTHeld(false);
+        }}
+        className={`absolute left-20 bottom-24 w-12 h-12 rounded-lg border flex items-center justify-center pointer-events-auto transition-all active:scale-90 ${
+          isVoiceTalking
+            ? "bg-emerald-600/90 border-emerald-400 text-white shadow-lg shadow-emerald-500/50 animate-pulse"
+            : voiceStatus === "connected" && !isVoiceMuted
+            ? "bg-neutral-900/80 border-neutral-600 text-neutral-200"
+            : "bg-rose-950/70 border-rose-600 text-rose-300"
+        }`}
+      >
+        <div className="flex flex-col items-center leading-none">
+          {voiceStatus === "connected" && !isVoiceMuted ? (
+            <Mic className={`w-4 h-4 ${isVoiceTalking ? "text-white" : "text-emerald-400"}`} />
+          ) : (
+            <MicOff className="w-4 h-4 text-rose-400" />
+          )}
+          <span className="text-[8px] font-bold uppercase tracking-tight mt-0.5 font-mono">
+            {isVoiceTalking ? "TALK" : "PTT"}
+          </span>
         </div>
       </button>
     </div>

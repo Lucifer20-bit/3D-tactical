@@ -18,6 +18,8 @@ import { SettingsModal, ScoreboardModal } from "./components/GameModals";
 import { GunsmithModal } from "./components/GunsmithModal";
 import { RankedMatchModal } from "./components/RankedMatchModal";
 import { SpectatorHUD } from "./components/SpectatorHUD";
+import { ProximityVoiceHUD } from "./components/ProximityVoiceHUD";
+import { webrtcVoice } from "./game/webrtcVoice";
 import {
   loadSavedLoadouts,
   saveLoadouts,
@@ -51,6 +53,13 @@ const DEFAULT_SETTINGS: GameSettings = {
   touchControlsOpacity: 0.85,
   haptics: true,
   bloodEffects: true,
+  voiceChatEnabled: true,
+  voiceMode: "push_to_talk",
+  voiceVolume: 0.85,
+  micSensitivity: 0.04,
+  proximityMaxDistance: 35,
+  spatialAudio: true,
+  radioFilterEnabled: true,
 };
 
 interface GrenadeObj {
@@ -263,6 +272,18 @@ export default function App() {
           playerPositionRef.current.set(me.x, me.y, me.z);
         }
         setPlayersList(data.players);
+
+        // Initialize WebRTC Voice Chat for tactical team comms
+        webrtcVoice.init(data.playerId, data.team, {
+          enabled: settingsRef.current.voiceChatEnabled,
+          mode: settingsRef.current.voiceMode,
+          voiceVolume: settingsRef.current.voiceVolume,
+          micSensitivity: settingsRef.current.micSensitivity,
+          proximityMaxDistance: settingsRef.current.proximityMaxDistance,
+          spatialAudio: settingsRef.current.spatialAudio,
+          radioFilterEnabled: settingsRef.current.radioFilterEnabled,
+        });
+        webrtcVoice.syncTeammates(data.players);
       },
       onStateDelta: (delta) => {
         setAlphaScore(delta.alphaScore);
@@ -343,6 +364,8 @@ export default function App() {
             deaths: p.d,
             score: p.sc,
             ping: p.png,
+            isTalking: !!p.tlk,
+            isMuted: !!p.mut,
           });
         });
 
@@ -354,6 +377,7 @@ export default function App() {
         mesh.root.position.set(player.x, player.y, player.z);
         scene.add(mesh.root);
         remotePlayersRef.current.set(player.id, mesh);
+        webrtcVoice.syncTeammates(Array.from(remoteStatesRef.current.values()));
       },
       onPlayerLeft: (playerId) => {
         const mesh = remotePlayersRef.current.get(playerId);
@@ -362,6 +386,17 @@ export default function App() {
           remotePlayersRef.current.delete(playerId);
         }
         remoteStatesRef.current.delete(playerId);
+        webrtcVoice.syncTeammates(Array.from(remoteStatesRef.current.values()));
+      },
+      onVoiceSignal: (data) => {
+        webrtcVoice.handleVoiceSignal(data.senderId, data.signal);
+      },
+      onVoiceState: (data) => {
+        const state = remoteStatesRef.current.get(data.playerId);
+        if (state) {
+          state.isTalking = data.isTalking;
+          state.isMuted = data.isMuted;
+        }
       },
       onPlayerShot: (data) => {
         // Play remote gunshot audio if nearby
@@ -530,6 +565,20 @@ export default function App() {
       updateRemotePlayers(delta);
       updateGrenades(delta);
 
+      // WebRTC 3D Proximity Audio & HRTF Spatial calculation
+      if (cameraRef.current) {
+        webrtcVoice.updateSpatialPositions(
+          {
+            x: playerPositionRef.current.x,
+            y: playerPositionRef.current.y,
+            z: playerPositionRef.current.z,
+            yaw: playerRotationRef.current.yaw,
+            pitch: playerRotationRef.current.pitch,
+          },
+          remoteStatesRef.current as any
+        );
+      }
+
       // Render Scene
       if (rendererRef.current && sceneRef.current && cameraRef.current) {
         rendererRef.current.render(sceneRef.current, cameraRef.current);
@@ -548,6 +597,7 @@ export default function App() {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("contextmenu", handleContextMenu);
       network.disconnect();
+      webrtcVoice.stopVoice();
       if (rendererRef.current) {
         rendererRef.current.dispose();
       }
@@ -1198,6 +1248,14 @@ export default function App() {
             }}
           />
 
+          {/* WebRTC Tactical Squad Proximity Voice Chat HUD */}
+          {settings.voiceChatEnabled && (
+            <ProximityVoiceHUD
+              team={myTeam}
+              onOpenVoiceSettings={() => setIsSettingsOpen(true)}
+            />
+          )}
+
           {/* Mobile Touchscreen Virtual Joystick & Tactical Action Controls */}
           <TouchControls
             onMove={handleJoystickMove}
@@ -1299,7 +1357,21 @@ export default function App() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         settings={settings}
-        onUpdateSettings={(newVals) => setSettings((prev) => ({ ...prev, ...newVals }))}
+        onUpdateSettings={(newVals) => {
+          setSettings((prev) => {
+            const updated = { ...prev, ...newVals };
+            webrtcVoice.updateSettings({
+              enabled: updated.voiceChatEnabled,
+              mode: updated.voiceMode,
+              voiceVolume: updated.voiceVolume,
+              micSensitivity: updated.micSensitivity,
+              proximityMaxDistance: updated.proximityMaxDistance,
+              spatialAudio: updated.spatialAudio,
+              radioFilterEnabled: updated.radioFilterEnabled,
+            });
+            return updated;
+          });
+        }}
         roomId={roomId}
       />
 

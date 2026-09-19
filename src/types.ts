@@ -126,6 +126,8 @@ export interface PlayerNetState {
   score: number;
   ping: number;
   rankDivision?: RankDivision;
+  isTalking?: boolean;
+  isMuted?: boolean;
 }
 
 export interface KillfeedEntry {
@@ -152,6 +154,33 @@ export interface DamageIndicator {
   timestamp: number;
 }
 
+export type VoiceTransmissionMode = "push_to_talk" | "open_mic";
+
+export interface VoiceChatSettings {
+  enabled: boolean;
+  mode: VoiceTransmissionMode;
+  micSensitivity: number; // 0.01 to 0.20
+  proximityMaxDistance: number; // 10 to 60 meters
+  spatialAudio: boolean;
+  radioFilterEnabled: boolean;
+  voiceVolume: number; // 0 to 1
+  micVolume: number; // 0 to 1
+  isDeafened: boolean;
+  isMuted: boolean;
+}
+
+export interface TeammateVoiceStatus {
+  playerId: string;
+  playerName: string;
+  team: "alpha" | "bravo";
+  isTalking: boolean;
+  isMuted: boolean;
+  distance: number;
+  volume: number;
+  hasActiveStream: boolean;
+  isRadioTransmission?: boolean;
+}
+
 export interface GameSettings {
   lookSensitivity: number;
   adsSensitivity: number;
@@ -163,6 +192,13 @@ export interface GameSettings {
   touchControlsOpacity: number;
   haptics: boolean;
   bloodEffects: boolean;
+  voiceChatEnabled: boolean;
+  voiceMode: VoiceTransmissionMode;
+  voiceVolume: number;
+  micSensitivity: number;
+  proximityMaxDistance: number;
+  spatialAudio: boolean;
+  radioFilterEnabled: boolean;
 }
 
 export type SpectatorCameraMode = "first_person" | "third_person" | "free_cam";

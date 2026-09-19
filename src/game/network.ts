@@ -12,6 +12,8 @@ export interface NetworkCallbacks {
   onArmorUpdated: (data: { armor: number; plates: number }) => void;
   onUAVActivated: (data: { callerId: string; callerTeam: "alpha" | "bravo"; duration: number }) => void;
   onPingUpdate: (ping: number) => void;
+  onVoiceSignal?: (data: { senderId: string; signal: any }) => void;
+  onVoiceState?: (data: { playerId: string; isTalking: boolean; isMuted: boolean }) => void;
 }
 
 export class GameNetwork {
@@ -132,6 +134,16 @@ export class GameNetwork {
       case "uav_activated":
         this.callbacks.onUAVActivated(data);
         break;
+      case "voice_signal":
+        if (this.callbacks.onVoiceSignal) {
+          this.callbacks.onVoiceSignal(data);
+        }
+        break;
+      case "voice_state":
+        if (this.callbacks.onVoiceState) {
+          this.callbacks.onVoiceState(data);
+        }
+        break;
     }
   }
 
@@ -197,6 +209,30 @@ export class GameNetwork {
   public sendCallUAV() {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ type: "call_uav" }));
+    }
+  }
+
+  public sendVoiceSignal(targetId: string, signal: any) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(
+        JSON.stringify({
+          type: "voice_signal",
+          targetId,
+          signal,
+        })
+      );
+    }
+  }
+
+  public sendVoiceState(isTalking: boolean, isMuted: boolean) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(
+        JSON.stringify({
+          type: "voice_state",
+          isTalking,
+          isMuted,
+        })
+      );
     }
   }
 

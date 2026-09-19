@@ -28,6 +28,8 @@ interface PlayerState {
   score: number;
   ping: number;
   lastPingTime: number;
+  isTalking?: boolean;
+  isMuted?: boolean;
 }
 
 interface Room {
@@ -519,6 +521,36 @@ async function startServer() {
             position: msg.position,
             velocity: msg.velocity,
           });
+        } else if (msg.type === "voice_signal") {
+          // Relay WebRTC signaling (offer / answer / ice-candidate) to target teammate
+          if (msg.targetId && msg.signal) {
+            const targetWs = room.clients.get(msg.targetId);
+            if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+              targetWs.send(
+                JSON.stringify({
+                  type: "voice_signal",
+                  senderId: playerId,
+                  signal: msg.signal,
+                })
+              );
+            }
+          }
+        } else if (msg.type === "voice_state") {
+          // Broadcast local voice talking/mute state
+          if (newPlayer) {
+            newPlayer.isTalking = !!msg.isTalking;
+            newPlayer.isMuted = !!msg.isMuted;
+          }
+          broadcastToRoom(
+            room,
+            {
+              type: "voice_state",
+              playerId,
+              isTalking: !!msg.isTalking,
+              isMuted: !!msg.isMuted,
+            },
+            playerId
+          );
         }
       } catch (err) {
         console.error("WS message error", err);
@@ -562,6 +594,8 @@ async function startServer() {
         d: p.deaths,
         sc: p.score,
         png: p.ping,
+        tlk: !!p.isTalking,
+        mut: !!p.isMuted,
       }));
 
       const deltaPayload = JSON.stringify({

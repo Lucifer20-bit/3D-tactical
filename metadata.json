@@ -1,6 +1,6 @@
 {
   "name": "3D Tactical FPS",
   "description": "A 3D first-person shooter featuring real-time multiplayer combat, Call of Duty & Bloodstrike mechanics like slide cancelling and armor plating, optimized mobile touchscreen controls, and low-latency network performance.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
